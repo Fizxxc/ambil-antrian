@@ -1,45 +1,47 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ambil Antrian</title>
+  <title>Antrian Warung</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 </head>
-<body class="bg-white p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">Pesan Jajanan Warung</h1>
+<body class="bg-yellow-50 p-6">
+  <h1 class="text-2xl font-bold text-center mb-4">Ambil Antrian Warung</h1>
 
-  <form id="formAntrian" class="max-w-md mx-auto bg-gray-100 p-4 rounded shadow space-y-4">
-    <input id="nama" type="text" placeholder="Nama Anda" required class="w-full p-2 border rounded"/>
-
-    <select id="menu" required class="w-full p-2 border rounded">
-      <option value="">Pilih Menu</option>
-      <option>Es Teh</option>
-      <option>Mie (Kuah)</option>
-      <option>Mie (Goreng)</option>
-      <option>Martel</option>
-      <option>Es Tejus</option>
-      <option>Cilor</option>
-      <option>Maklor</option>
+  <div class="max-w-md mx-auto bg-white p-4 rounded shadow">
+    <label class="block mb-2 font-semibold">Nama Anda</label>
+    <input type="text" id="nama" placeholder="Masukkan Nama" class="w-full mb-3 border rounded px-3 py-2" />
+    <label class="block mb-2 font-semibold">Pilih Menu:</label>
+    <select id="menu" class="w-full border rounded px-3 py-2 mb-4">
+      <option value="es teh">Es Teh</option>
+      <option value="mie kuah">Mie Kuah</option>
+      <option value="mie goreng">Mie Goreng</option>
+      <option value="martel">Martel</option>
+      <option value="es tejus">Es Tejus</option>
+      <option value="cilor">Cilor</option>
+      <option value="maklor">Maklor</option>
     </select>
+    <button id="ambilBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Ambil Antrian</button>
+    <div class="mt-4 text-center" id="infoAntrian"></div>
+    <div id="qrcode" class="mt-4 flex justify-center"></div>
+  </div>
 
-    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-      Ambil Antrian
-    </button>
-  </form>
-
-  <div id="notif" class="text-center text-green-600 mt-4 hidden">Antrian berhasil ditambahkan!</div>
+  <audio id="notifAudio" src="https://www.soundjay.com/button/beep-07.mp3" preload="auto"></audio>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
       authDomain: "orderr-625c2.firebaseapp.com",
       databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "orderr-625c2",
-      storageBucket: "orderr-625c2.firebasestorage.app",
+      storageBucket: "orderr-625c2.appspot.com",
       messagingSenderId: "891679772111",
       appId: "1:891679772111:web:1b5999b967bd17c87356ba",
       measurementId: "G-06W3BTP7HH"
@@ -49,29 +51,74 @@
     const db = getDatabase(app);
     const antrianRef = ref(db, "antrian");
 
-    const form = document.getElementById("formAntrian");
-    const notif = document.getElementById("notif");
+    const ambilBtn = document.getElementById("ambilBtn");
+    const menuSelect = document.getElementById("menu");
+    const namaInput = document.getElementById("nama");
+    const infoDiv = document.getElementById("infoAntrian");
+    const notifAudio = document.getElementById("notifAudio");
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nama = document.getElementById("nama").value.trim();
-      const menu = document.getElementById("menu").value;
+    ambilBtn.onclick = async () => {
+      const nama = namaInput.value.trim();
+      const pesanan = menuSelect.value;
 
-      if (!nama || !menu) return;
-
-      const snapshot = await get(antrianRef);
-      let nomor = 1;
-      if (snapshot.exists()) {
-        const data = Object.values(snapshot.val());
-        nomor = data.length + 1;
+      if (!nama) {
+        Swal.fire("Nama belum diisi", "Silakan isi nama Anda", "warning");
+        return;
       }
 
-      await push(antrianRef, { nama: `${nama} (${menu})`, nomor });
+      const snapshot = await fetchAntrian();
+      const nomor = snapshot.length + 1;
 
-      notif.classList.remove("hidden");
-      form.reset();
-      setTimeout(() => notif.classList.add("hidden"), 3000);
-    });
+      const newRef = push(antrianRef, {
+        nama,
+        pesanan,
+        nomor,
+        dipanggil: false,
+        selesai: false
+      });
+
+      localStorage.setItem("myAntrianId", newRef.key);
+      infoDiv.innerHTML = `<p class="mt-2">Hai <strong>${nama}</strong>, nomor antrian Anda: <strong>${nomor}</strong></p>`;
+      generateQR(window.location.href + `?id=${newRef.key}`);
+    };
+
+    function generateQR(link) {
+      const qrDiv = document.getElementById("qrcode");
+      qrDiv.innerHTML = "";
+      QRCode.toCanvas(document.createElement("canvas"), link, (err, canvas) => {
+        if (!err) qrDiv.appendChild(canvas);
+      });
+    }
+
+    function fetchAntrian() {
+      return new Promise((resolve) => {
+        onValue(antrianRef, (snapshot) => {
+          const result = [];
+          snapshot.forEach((child) => {
+            result.push({ id: child.key, ...child.val() });
+          });
+          resolve(result);
+        }, { onlyOnce: true });
+      });
+    }
+
+    // Pantau status panggilan
+    const myId = new URLSearchParams(window.location.search).get("id") || localStorage.getItem("myAntrianId");
+    if (myId) {
+      const myRef = ref(db, `antrian/${myId}`);
+      onValue(myRef, (snap) => {
+        const data = snap.val();
+        if (data?.dipanggil) {
+          notifAudio.play();
+          Swal.fire({
+            title: `Nomor ${data.nomor}`,
+            text: `Halo ${data.nama}, pesanan ${data.pesanan} Anda dipanggil!`,
+            icon: "success",
+            confirmButtonText: "Oke"
+          });
+        }
+      });
+    }
   </script>
 </body>
 </html>
