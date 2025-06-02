@@ -112,8 +112,8 @@
         if (data?.dipanggil && !alreadyNotified) {
           notifAudio.play();
           Swal.fire({
-            title: `Nomor ${data.nomor}`,
-            text: `Halo ${data.nama}, pesanan ${data.pesanan} Anda dipanggil!`,
+            title: `Nomor ${nomor}`,
+            text: `Halo ${nama}, pesanan ${pesanan} Anda dipanggil!`,
             icon: "success",
             confirmButtonText: "Oke"
           });
