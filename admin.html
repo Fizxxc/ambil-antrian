@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Antrian</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <h1 class="text-3xl font-bold mb-6 text-center">Dashboard Antrian</h1>
+
+  <div class="flex justify-center gap-2 mb-4">
+    <button id="panggilBtn" class="bg-green-600 text-white px-4 py-2 rounded">Panggil Berikutnya</button>
+    <button id="selesaiBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Antrian Selesai</button>
+    <button id="hapusBtn" class="bg-red-600 text-white px-4 py-2 rounded">Hapus Semua</button>
+  </div>
+
+  <div id="sedangDipanggil" class="text-center text-xl font-bold text-blue-700 mb-4 hidden"></div>
+
+  <div id="daftarAntrian" class="grid gap-4 max-w-xl mx-auto"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, remove, get, child } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
+      authDomain: "orderr-625c2.firebaseapp.com",
+      databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "orderr-625c2",
+      storageBucket: "orderr-625c2.firebasestorage.app",
+      messagingSenderId: "891679772111",
+      appId: "1:891679772111:web:1b5999b967bd17c87356ba",
+      measurementId: "G-06W3BTP7HH"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const daftarEl = document.getElementById("daftarAntrian");
+    const sedangDipanggil = document.getElementById("sedangDipanggil");
+    const antrianRef = ref(db, "antrian");
+
+    // Tampilkan semua antrian realtime
+    onValue(antrianRef, (snapshot) => {
+      daftarEl.innerHTML = "";
+      const data = snapshot.val();
+      if (data) {
+        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        list.sort((a, b) => a.nomor - b.nomor);
+        for (let item of list) {
+          const el = document.createElement("div");
+          el.className = "bg-white p-4 rounded shadow";
+          el.innerHTML = `<p class="font-bold text-lg">#${item.nomor}</p><p>${item.nama}</p>`;
+          daftarEl.appendChild(el);
+        }
+      } else {
+        daftarEl.innerHTML = "<p class='text-center text-gray-500'>Belum ada antrian.</p>";
+      }
+    });
+
+    // Tombol: Hapus semua antrian
+    document.getElementById("hapusBtn").addEventListener("click", () => {
+      if (confirm("Yakin ingin menghapus semua antrian?")) {
+        remove(antrianRef);
+        sedangDipanggil.classList.add("hidden");
+      }
+    });
+
+    // Tombol: Panggil berikutnya
+    document.getElementById("panggilBtn").addEventListener("click", async () => {
+      const snapshot = await get(antrianRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        list.sort((a, b) => a.nomor - b.nomor);
+        if (list.length > 0) {
+          const berikutnya = list[0];
+          sedangDipanggil.innerText = `Sedang Dipanggil: #${berikutnya.nomor} - ${berikutnya.nama}`;
+          sedangDipanggil.classList.remove("hidden");
+        }
+      }
+    });
+
+    // Tombol: Antrian selesai (hapus yang paling atas)
+    document.getElementById("selesaiBtn").addEventListener("click", async () => {
+      const snapshot = await get(antrianRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        list.sort((a, b) => a.nomor - b.nomor);
+        if (list.length > 0) {
+          const palingDepan = list[0];
+          await remove(ref(db, `antrian/${palingDepan.id}`));
+          sedangDipanggil.classList.add("hidden");
+        }
+      }
+    });
+  </script>
+</body>
+</html>

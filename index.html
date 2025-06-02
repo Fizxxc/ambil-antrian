@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ambil Antrian</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-6 rounded shadow-md w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Ambil Nomor Antrian</h1>
+    <input id="nama" type="text" placeholder="Masukkan Nama" class="w-full p-2 border rounded mb-4" />
+    <button id="ambilBtn" class="w-full bg-blue-600 text-white p-2 rounded">Ambil Antrian</button>
+    <p id="hasil" class="text-center mt-4 text-green-600 font-bold"></p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
+      authDomain: "orderr-625c2.firebaseapp.com",
+      databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "orderr-625c2",
+      storageBucket: "orderr-625c2.firebasestorage.app",
+      messagingSenderId: "891679772111",
+      appId: "1:891679772111:web:1b5999b967bd17c87356ba",
+      measurementId: "G-06W3BTP7HH"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const namaInput = document.getElementById("nama");
+    const hasil = document.getElementById("hasil");
+    const btn = document.getElementById("ambilBtn");
+
+    btn.addEventListener("click", async () => {
+      const nama = namaInput.value.trim();
+      if (!nama) {
+        alert("Nama tidak boleh kosong!");
+        return;
+      }
+
+      const antrianRef = ref(db, "antrian");
+      const snapshot = await get(antrianRef);
+      const data = snapshot.exists() ? snapshot.val() : {};
+      const nomor = Object.keys(data).length + 1;
+
+      await push(antrianRef, {
+        nama: nama,
+        nomor: nomor,
+        waktu: Date.now()
+      });
+
+      hasil.innerText = `Nomor antrian Anda: ${nomor}`;
+      namaInput.value = "";
+    });
+  </script>
+</body>
+</html>
