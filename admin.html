@@ -1,101 +1,63 @@
+<!-- admin.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard Antrian</title>
+  <title>Admin Antrian</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">Dashboard Antrian</h1>
-
-  <div class="flex justify-center gap-2 mb-4">
-    <button id="panggilBtn" class="bg-green-600 text-white px-4 py-2 rounded">Panggil Berikutnya</button>
-    <button id="selesaiBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Antrian Selesai</button>
-    <button id="hapusBtn" class="bg-red-600 text-white px-4 py-2 rounded">Hapus Semua</button>
-  </div>
-
-  <div id="sedangDipanggil" class="text-center text-xl font-bold text-blue-700 mb-4 hidden"></div>
-
-  <div id="daftarAntrian" class="grid gap-4 max-w-xl mx-auto"></div>
+  <h1 class="text-2xl font-bold mb-4 text-center">Panel Admin Antrian</h1>
+  <div id="list" class="space-y-4 max-w-xl mx-auto"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getDatabase, ref, onValue, set, remove, get, child } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+    import { getDatabase, ref, onValue, remove, update } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
       authDomain: "orderr-625c2.firebaseapp.com",
       databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "orderr-625c2",
-      storageBucket: "orderr-625c2.firebasestorage.app",
+      storageBucket: "orderr-625c2.appspot.com",
       messagingSenderId: "891679772111",
-      appId: "1:891679772111:web:1b5999b967bd17c87356ba",
-      measurementId: "G-06W3BTP7HH"
+      appId: "1:891679772111:web:1b5999b967bd17c87356ba"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
-    const daftarEl = document.getElementById("daftarAntrian");
-    const sedangDipanggil = document.getElementById("sedangDipanggil");
     const antrianRef = ref(db, "antrian");
 
-    // Tampilkan semua antrian realtime
+    const list = document.getElementById("list");
+
     onValue(antrianRef, (snapshot) => {
-      daftarEl.innerHTML = "";
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-        list.sort((a, b) => a.nomor - b.nomor);
-        for (let item of list) {
-          const el = document.createElement("div");
-          el.className = "bg-white p-4 rounded shadow";
-          el.innerHTML = `<p class="font-bold text-lg">#${item.nomor}</p><p>${item.nama}</p>`;
-          daftarEl.appendChild(el);
-        }
-      } else {
-        daftarEl.innerHTML = "<p class='text-center text-gray-500'>Belum ada antrian.</p>";
-      }
+      list.innerHTML = "";
+      snapshot.forEach((child) => {
+        const data = child.val();
+        const id = child.key;
+        if (data.selesai) return;
+
+        const card = document.createElement("div");
+        card.className = "bg-white p-4 rounded shadow";
+
+        card.innerHTML = `
+          <p><strong>Nomor:</strong> ${data.nomor}</p>
+          <p><strong>Nama:</strong> ${data.nama}</p>
+          <p><strong>Pesanan:</strong> ${data.pesanan}</p>
+          <div class="mt-2 space-x-2">
+            <button onclick="panggil('${id}')" class="bg-blue-500 text-white px-3 py-1 rounded">Panggil</button>
+            <button onclick="selesai('${id}')" class="bg-green-500 text-white px-3 py-1 rounded">Selesai</button>
+            <button onclick="hapus('${id}')" class="bg-red-500 text-white px-3 py-1 rounded">Hapus</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
     });
 
-    // Tombol: Hapus semua antrian
-    document.getElementById("hapusBtn").addEventListener("click", () => {
-      if (confirm("Yakin ingin menghapus semua antrian?")) {
-        remove(antrianRef);
-        sedangDipanggil.classList.add("hidden");
-      }
-    });
-
-    // Tombol: Panggil berikutnya
-    document.getElementById("panggilBtn").addEventListener("click", async () => {
-      const snapshot = await get(antrianRef);
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-        list.sort((a, b) => a.nomor - b.nomor);
-        if (list.length > 0) {
-          const berikutnya = list[0];
-          sedangDipanggil.innerText = `Sedang Dipanggil: #${berikutnya.nomor} - ${berikutnya.nama}`;
-          sedangDipanggil.classList.remove("hidden");
-        }
-      }
-    });
-
-    // Tombol: Antrian selesai (hapus yang paling atas)
-    document.getElementById("selesaiBtn").addEventListener("click", async () => {
-      const snapshot = await get(antrianRef);
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-        list.sort((a, b) => a.nomor - b.nomor);
-        if (list.length > 0) {
-          const palingDepan = list[0];
-          await remove(ref(db, `antrian/${palingDepan.id}`));
-          sedangDipanggil.classList.add("hidden");
-        }
-      }
-    });
+    window.panggil = (id) => update(ref(db, "antrian/" + id), { dipanggil: true });
+    window.selesai = (id) => update(ref(db, "antrian/" + id), { selesai: true });
+    window.hapus = (id) => remove(ref(db, "antrian/" + id));
   </script>
 </body>
 </html>
