@@ -6,13 +6,29 @@
   <title>Ambil Antrian</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div class="bg-white p-6 rounded shadow-md w-full max-w-md">
-    <h1 class="text-2xl font-bold mb-4 text-center">Ambil Nomor Antrian</h1>
-    <input id="nama" type="text" placeholder="Masukkan Nama" class="w-full p-2 border rounded mb-4" />
-    <button id="ambilBtn" class="w-full bg-blue-600 text-white p-2 rounded">Ambil Antrian</button>
-    <p id="hasil" class="text-center mt-4 text-green-600 font-bold"></p>
-  </div>
+<body class="bg-white p-6">
+  <h1 class="text-3xl font-bold mb-6 text-center">Pesan Jajanan Warung</h1>
+
+  <form id="formAntrian" class="max-w-md mx-auto bg-gray-100 p-4 rounded shadow space-y-4">
+    <input id="nama" type="text" placeholder="Nama Anda" required class="w-full p-2 border rounded"/>
+
+    <select id="menu" required class="w-full p-2 border rounded">
+      <option value="">Pilih Menu</option>
+      <option>Es Teh</option>
+      <option>Mie (Kuah)</option>
+      <option>Mie (Goreng)</option>
+      <option>Martel</option>
+      <option>Es Tejus</option>
+      <option>Cilor</option>
+      <option>Maklor</option>
+    </select>
+
+    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+      Ambil Antrian
+    </button>
+  </form>
+
+  <div id="notif" class="text-center text-green-600 mt-4 hidden">Antrian berhasil ditambahkan!</div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
@@ -31,31 +47,30 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const antrianRef = ref(db, "antrian");
 
-    const namaInput = document.getElementById("nama");
-    const hasil = document.getElementById("hasil");
-    const btn = document.getElementById("ambilBtn");
+    const form = document.getElementById("formAntrian");
+    const notif = document.getElementById("notif");
 
-    btn.addEventListener("click", async () => {
-      const nama = namaInput.value.trim();
-      if (!nama) {
-        alert("Nama tidak boleh kosong!");
-        return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nama = document.getElementById("nama").value.trim();
+      const menu = document.getElementById("menu").value;
+
+      if (!nama || !menu) return;
+
+      const snapshot = await get(antrianRef);
+      let nomor = 1;
+      if (snapshot.exists()) {
+        const data = Object.values(snapshot.val());
+        nomor = data.length + 1;
       }
 
-      const antrianRef = ref(db, "antrian");
-      const snapshot = await get(antrianRef);
-      const data = snapshot.exists() ? snapshot.val() : {};
-      const nomor = Object.keys(data).length + 1;
+      await push(antrianRef, { nama: `${nama} (${menu})`, nomor });
 
-      await push(antrianRef, {
-        nama: nama,
-        nomor: nomor,
-        waktu: Date.now()
-      });
-
-      hasil.innerText = `Nomor antrian Anda: ${nomor}`;
-      namaInput.value = "";
+      notif.classList.remove("hidden");
+      form.reset();
+      setTimeout(() => notif.classList.add("hidden"), 3000);
     });
   </script>
 </body>
