@@ -1,20 +1,49 @@
-<!-- admin.html -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Antrian</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Panel Antrian Jajanan</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://cdn.tailwindcss.com" rel="stylesheet" />
 </head>
-<body class="bg-gray-100 p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">Panel Admin Antrian</h1>
-  <div id="list" class="space-y-4 max-w-xl mx-auto"></div>
+<body class="bg-yellow-50 min-h-screen p-6 flex flex-col">
+
+  <div class="max-w-5xl mx-auto bg-white shadow-lg rounded-lg p-6">
+    <h1 class="text-4xl font-extrabold text-yellow-700 mb-6 text-center">Admin Panel Antrian Jajanan</h1>
+
+    <div class="flex flex-col md:flex-row justify-between mb-6 space-y-4 md:space-y-0 md:space-x-6">
+      <div class="flex gap-6 justify-center md:justify-start text-yellow-800 font-semibold text-lg">
+        <div>Total Antrian: <span id="statsTotal" class="font-bold">0</span></div>
+        <div>Menunggu: <span id="statsWaiting" class="font-bold">0</span></div>
+        <div>Selesai: <span id="statsDone" class="font-bold">0</span></div>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold mb-3 text-yellow-700">Daftar Antrian</h2>
+      <div class="overflow-x-auto max-h-[450px] border border-yellow-300 rounded-md">
+        <table class="min-w-full table-auto text-left text-sm text-gray-700">
+          <thead class="bg-yellow-200 sticky top-0">
+            <tr>
+              <th class="px-4 py-3">Nomor</th>
+              <th class="px-4 py-3">Nama</th>
+              <th class="px-4 py-3">Pesanan</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3 text-center">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="antrianList" class="divide-y divide-yellow-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getDatabase, ref, onValue, remove, update } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+    import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
+    // Firebase config (sama seperti di index.html)
     const firebaseConfig = {
       apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
       authDomain: "orderr-625c2.firebaseapp.com",
@@ -22,42 +51,96 @@
       projectId: "orderr-625c2",
       storageBucket: "orderr-625c2.appspot.com",
       messagingSenderId: "891679772111",
-      appId: "1:891679772111:web:1b5999b967bd17c87356ba"
+      appId: "1:891679772111:web:1b5999b967bd17c87356ba",
+      measurementId: "G-06W3BTP7HH"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const antrianRef = ref(db, "antrian");
+    const antrianRef = ref(db, 'antrian');
+    const panggilRef = ref(db, 'panggilan');
 
-    const list = document.getElementById("list");
+    const antrianList = document.getElementById('antrianList');
+    const statsTotal = document.getElementById('statsTotal');
+    const statsWaiting = document.getElementById('statsWaiting');
+    const statsDone = document.getElementById('statsDone');
 
+    // Render list antrian ke tabel
     onValue(antrianRef, (snapshot) => {
-      list.innerHTML = "";
-      snapshot.forEach((child) => {
-        const data = child.val();
-        const id = child.key;
-        if (data.selesai) return;
+      const data = snapshot.val() || {};
+      antrianList.innerHTML = '';
+      let total = 0, waiting = 0, done = 0;
 
-        const card = document.createElement("div");
-        card.className = "bg-white p-4 rounded shadow";
+      // Data disortir berdasarkan nomor ascending
+      const sortedEntries = Object.entries(data).sort((a,b) => a[1].nomor - b[1].nomor);
 
-        card.innerHTML = `
-          <p><strong>Nomor:</strong> ${data.nomor}</p>
-          <p><strong>Nama:</strong> ${data.nama}</p>
-          <p><strong>Pesanan:</strong> ${data.pesanan}</p>
-          <div class="mt-2 space-x-2">
-            <button onclick="panggil('${id}')" class="bg-blue-500 text-white px-3 py-1 rounded">Panggil</button>
-            <button onclick="selesai('${id}')" class="bg-green-500 text-white px-3 py-1 rounded">Selesai</button>
-            <button onclick="hapus('${id}')" class="bg-red-500 text-white px-3 py-1 rounded">Hapus</button>
-          </div>
-        `;
-        list.appendChild(card);
+      sortedEntries.forEach(([key, val]) => {
+        total++;
+        if (val.status === 'waiting') waiting++;
+        else done++;
+
+        antrianList.insertAdjacentHTML('beforeend', `
+          <tr class="${val.status === 'done' ? 'bg-yellow-50 line-through' : ''}">
+            <td class="px-4 py-3 font-bold text-yellow-700">${val.nomor}</td>
+            <td class="px-4 py-3">${val.nama}</td>
+            <td class="px-4 py-3">${val.pesanan}</td>
+            <td class="px-4 py-3 capitalize font-semibold">${val.status}</td>
+            <td class="px-4 py-3 text-center space-x-2">
+              ${val.status === 'waiting' 
+                ? `<button data-id="${key}" class="btn-panggil bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-1 px-3 rounded-md transition">Panggil</button>`
+                : ''
+              }
+              <button data-id="${key}" class="btn-selesai bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-md transition">Selesai</button>
+              <button data-id="${key}" class="btn-hapus bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition">Hapus</button>
+            </td>
+          </tr>
+        `);
+      });
+
+      statsTotal.textContent = total;
+      statsWaiting.textContent = waiting;
+      statsDone.textContent = done;
+
+      // Pasang event listener button
+      document.querySelectorAll('.btn-panggil').forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.id;
+          // Update panggilan di Firebase (tambah entry panggilan dengan nomor)
+          update(panggilRef, { [id]: data[id].nomor });
+          Swal.fire('Dipanggil', `Nomor ${data[id].nomor} telah dipanggil!`, 'success');
+        };
+      });
+
+      document.querySelectorAll('.btn-selesai').forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.id;
+          update(ref(db, 'antrian/' + id), { status: 'done' });
+          Swal.fire('Selesai', `Nomor ${data[id].nomor} sudah selesai.`, 'success');
+        };
+      });
+
+      document.querySelectorAll('.btn-hapus').forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.id;
+          Swal.fire({
+            title: 'Hapus antrian?',
+            text: `Yakin ingin menghapus nomor ${data[id].nomor}?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, hapus',
+            cancelButtonText: 'Batal'
+          }).then(result => {
+            if (result.isConfirmed) {
+              remove(ref(db, 'antrian/' + id));
+              remove(ref(db, 'panggilan/' + id));
+              Swal.fire('Terhapus', 'Antrian telah dihapus.', 'success');
+            }
+          });
+        };
       });
     });
 
-    window.panggil = (id) => update(ref(db, "antrian/" + id), { dipanggil: true });
-    window.selesai = (id) => update(ref(db, "antrian/" + id), { selesai: true });
-    window.hapus = (id) => remove(ref(db, "antrian/" + id));
   </script>
+
 </body>
 </html>
