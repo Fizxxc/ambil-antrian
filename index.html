@@ -32,98 +32,104 @@
   <audio id="notifAudio" src="https://www.soundjay.com/button/beep-07.mp3" preload="auto"></audio>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+  import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
-      authDomain: "orderr-625c2.firebaseapp.com",
-      databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "orderr-625c2",
-      storageBucket: "orderr-625c2.appspot.com",
-      messagingSenderId: "891679772111",
-      appId: "1:891679772111:web:1b5999b967bd17c87356ba",
-      measurementId: "G-06W3BTP7HH"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyDpv9uvfdUPKnyBKESB2fDEUwuDn9Nzmtg",
+    authDomain: "orderr-625c2.firebaseapp.com",
+    databaseURL: "https://orderr-625c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "orderr-625c2",
+    storageBucket: "orderr-625c2.appspot.com",
+    messagingSenderId: "891679772111",
+    appId: "1:891679772111:web:1b5999b967bd17c87356ba",
+    measurementId: "G-06W3BTP7HH"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const antrianRef = ref(db, "antrian");
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const antrianRef = ref(db, "antrian");
 
-    const ambilBtn = document.getElementById("ambilBtn");
-    const menuSelect = document.getElementById("menu");
-    const namaInput = document.getElementById("nama");
-    const infoDiv = document.getElementById("infoAntrian");
-    const notifAudio = document.getElementById("notifAudio");
+  const ambilBtn = document.getElementById("ambilBtn");
+  const menuSelect = document.getElementById("menu");
+  const namaInput = document.getElementById("nama");
+  const infoDiv = document.getElementById("infoAntrian");
+  const notifAudio = document.getElementById("notifAudio");
 
-    ambilBtn.onclick = async () => {
-      const nama = namaInput.value.trim();
-      const pesanan = menuSelect.value;
+  ambilBtn.onclick = async () => {
+    const nama = namaInput.value.trim();
+    const pesanan = menuSelect.value;
 
-      if (!nama) {
-        Swal.fire("Nama belum diisi", "Silakan isi nama Anda", "warning");
-        return;
-      }
-
-      const snapshot = await fetchAntrian();
-      const nomor = snapshot.length + 1;
-
-      const newRef = push(antrianRef, {
-        nama,
-        pesanan,
-        nomor,
-        dipanggil: false,
-        selesai: false
-      });
-
-      localStorage.setItem("myAntrianId", newRef.key);
-      infoDiv.innerHTML = `<p class="mt-2">Hai <strong>${nama}</strong>, nomor antrian Anda: <strong>${nomor}</strong></p>`;
-      generateQR(window.location.href + `?id=${newRef.key}`);
-    };
-
-    function generateQR(link) {
-      const qrDiv = document.getElementById("qrcode");
-      qrDiv.innerHTML = "";
-      QRCode.toCanvas(document.createElement("canvas"), link, (err, canvas) => {
-        if (!err) qrDiv.appendChild(canvas);
-      });
+    if (!nama) {
+      Swal.fire("Nama belum diisi", "Silakan isi nama Anda", "warning");
+      return;
     }
 
-    function fetchAntrian() {
-      return new Promise((resolve) => {
-        onValue(antrianRef, (snapshot) => {
-          const result = [];
-          snapshot.forEach((child) => {
-            result.push({ id: child.key, ...child.val() });
-          });
-          resolve(result);
-        }, { onlyOnce: true });
-      });
-    }
+    const snapshot = await fetchAntrian();
+    const nomor = snapshot.length + 1;
 
-    // Pantau status panggilan dan suara notifikasi
-    const myId = new URLSearchParams(window.location.search).get("id") || localStorage.getItem("myAntrianId");
-    if (myId) {
-      const myRef = ref(db, `antrian/${myId}`);
-      let alreadyNotified = false;
+    const newRef = push(antrianRef, {
+      nama,
+      pesanan,
+      nomor,
+      dipanggil: false,
+      selesai: false
+    });
 
-      onValue(myRef, (snap) => {
-        const data = snap.val();
-        if (data?.dipanggil && !alreadyNotified) {
-          notifAudio.play();
+    localStorage.setItem("myAntrianId", newRef.key);
+    infoDiv.innerHTML = `<p class="mt-2">Hai <strong>${nama}</strong>, nomor antrian Anda: <strong>${nomor}</strong></p>`;
+    generateQR(window.location.href.split('?')[0] + `?id=${newRef.key}`);
+  };
+
+  function generateQR(link) {
+    const qrDiv = document.getElementById("qrcode");
+    qrDiv.innerHTML = "";
+    QRCode.toCanvas(document.createElement("canvas"), link, (err, canvas) => {
+      if (!err) qrDiv.appendChild(canvas);
+    });
+  }
+
+  function fetchAntrian() {
+    return new Promise((resolve) => {
+      onValue(antrianRef, (snapshot) => {
+        const result = [];
+        snapshot.forEach((child) => {
+          result.push({ id: child.key, ...child.val() });
+        });
+        resolve(result);
+      }, { onlyOnce: true });
+    });
+  }
+
+  // Pantau status panggilan
+  const myId = new URLSearchParams(window.location.search).get("id") || localStorage.getItem("myAntrianId");
+  if (myId) {
+    const myRef = ref(db, `antrian/${myId}`);
+    let alreadyNotified = false;
+
+    onValue(myRef, (snap) => {
+      const data = snap.val();
+      if (data) {
+        infoDiv.innerHTML = `<p class="mt-2">Hai <strong>${data.nama}</strong>, nomor antrian Anda: <strong>${data.nomor}</strong></p>`;
+        generateQR(window.location.href.split('?')[0] + `?id=${myId}`);
+
+        if (data.dipanggil && !alreadyNotified) {
+          if (document.visibilityState === "visible") {
+            notifAudio.play();
+          }
           Swal.fire({
-            title: `Nomor ${nomor}`,
-            text: `Halo ${nama}, pesanan ${pesanan} Anda dipanggil!`,
+            title: `Nomor ${data.nomor}`,
+            text: `Halo ${data.nama}, pesanan ${data.pesanan} Anda dipanggil!`,
             icon: "success",
             confirmButtonText: "Oke"
           });
           alreadyNotified = true;
-        }
-        if (!data?.dipanggil) {
+        } else if (!data.dipanggil) {
           alreadyNotified = false;
         }
-      });
-    }
-  </script>
+      }
+    });
+  }
+</script>
 </body>
 </html>
